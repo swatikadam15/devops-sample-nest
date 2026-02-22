@@ -25,12 +25,12 @@ jobs:
       # Step 3: Build Docker image (with commit SHA and latest tags)
       - name: Build Docker image
         run: |
-          docker build -t client-a-node-app:${{ github.sha }} -t client-a-node-app:latest  .
+          docker build -t client-a-node-app:${{ github.sha }} -t client-a-node-app:latest .
 
       # Step 4: Tag Docker image for Docker Hub
       - name: Tag Docker image
         run: |
-          docker tag client-a-node-app:${{ github.sha }} swatikadam16/client-a-node-app${{ github.sha }}
+          docker tag client-a-node-app:${{ github.sha }} swatikadam16/client-a-node-app:${{ github.sha }}
           docker tag client-a-node-app:latest swatikadam16/client-a-node-app:latest
 
       # Step 5: Push Docker image to Docker Hub

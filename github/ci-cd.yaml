@@ -1,22 +1,69 @@
 name: Deploy
 
 on:
-push:
-branches: [ main ]
+  push:
+    branches:
+      - master       # Trigger when pushing to branch "master"
+  workflow_dispatch:  # Allow manual runs from GitHub Actions UI
+
 jobs:
-build:
-runs-on: ubuntu-latest
-steps:
-- uses: actions/checkout@v3
-- name: Build Image
-run: docker build -t client-a:${{ github.sha }} .
-- name: Tag Image
-run: docker tag client-a:${{ github.sha }} swatikadam16/client-a:${{ github.sha }}
-- name: Push
-run: docker push swatukadam16/client-a:${{ github.sha }}
-- name: Deploy to Swarm
-run: |
-ssh ec2-user@manager &quot;
-docker service update \
---image yourdockerhub/client-a:${{ github.sha }} \
-multi-client_client-a&quot;
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Step 2: Log in to Docker Hub
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Step 3: Build Docker image (with commit SHA and latest tags)
+      - name: Build Docker image
+        run: |
+          docker build -t client-a-node-app:${{ github.sha }} -t client-a-node-app:latest  .
+
+      # Step 4: Tag Docker image for Docker Hub
+      - name: Tag Docker image
+        run: |
+          docker tag client-a-node-app:${{ github.sha }} swatikadam16/client-a-node-app${{ github.sha }}
+          docker tag client-a-node-app:latest swatikadam16/client-a-node-app:latest
+
+      # Step 5: Push Docker image to Docker Hub
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push swatikadam16/client-a-node-app:${{ github.sha }}
+          docker push swatikadam16/client-a-node-app:latest
+
+      # Step 6: Test SSH Connectivity (Optional but Recommended)
+      - name: Test SSH connection
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          echo "${SSH_KEY}" > private_key.pem
+          chmod 600 private_key.pem
+          echo "Testing SSH connectivity to $SSH_USER@$SSH_HOST ..."
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "echo ✅ Connected successfully to $(hostname)"          
+
+      # Step 7: Deploy to Docker Swarm on remote host
+      - name: Deploy to Docker Swarm
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          echo "${SSH_KEY}" > private_key.pem
+          chmod 600 private_key.pem
+
+          echo "Deploying new image on remote Swarm manager..."
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST <<EOF
+          docker service update \
+          --image swatikadam16/client-a-node-app:${{ github.sha }} \
+          multi-client_client-a
+          EOF

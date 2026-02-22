@@ -11,31 +11,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repository
+
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 3: Build Docker image (directly with Docker Hub name)
+
       - name: Build Docker image
         run: |
           docker build \
             -t swatikadam16/client-a-node-app:${{ github.sha }} \
             .
 
-      # Step 4: Push Docker image to Docker Hub
       - name: Push Docker image to Docker Hub
         run: |
           docker push swatikadam16/client-a-node-app:${{ github.sha }}
   
 
-      # Step 5: Test SSH Connectivity
       - name: Test SSH connection
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -47,7 +44,6 @@ jobs:
           ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST \
           "echo ✅ Connected successfully to $(hostname)"
 
-      # Step 6: Deploy to Docker Swarm
       - name: Deploy to Docker Swarm
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}

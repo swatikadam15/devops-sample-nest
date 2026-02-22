@@ -1,0 +1,52 @@
+ervices:
+  client-a:
+    image: swatikadam16/client-a-node-app:latest
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.client-a.rule=Host(`client-a.example.com`)"
+        - "traefik.http.services.client-a.loadbalancer.server.port=3000"
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+    secrets:
+      - client_a_db
+    environment:
+      - NODE_ENV=production
+
+  client-b:
+    image: swatikadam16/client-b-python-app:latest
+    ports:
+      - "8000:8000"      
+    networks:
+      - app-network
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.client-b.rule=Host(`client-b.example.com`)"
+        - "traefik.http.services.client-b.loadbalancer.server.port=8000"
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+    secrets:
+      - client_b_db
+
+networks:
+  app-network:
+    external: true
+
+secrets:
+  client_a_db:
+    external: true
+  client_b_db:
+    external: true

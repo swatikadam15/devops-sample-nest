@@ -1,0 +1,22 @@
+name: Deploy
+
+on:
+push:
+branches: [ main ]
+jobs:
+build:
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v3
+- name: Build Image
+run: docker build -t client-a:${{ github.sha }} .
+- name: Tag Image
+run: docker tag client-a:${{ github.sha }} swatikadam16/client-a:${{ github.sha }}
+- name: Push
+run: docker push swatukadam16/client-a:${{ github.sha }}
+- name: Deploy to Swarm
+run: |
+ssh ec2-user@manager &quot;
+docker service update \
+--image yourdockerhub/client-a:${{ github.sha }} \
+multi-client_client-a&quot;

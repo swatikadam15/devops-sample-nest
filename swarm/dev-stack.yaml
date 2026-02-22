@@ -1,28 +1,91 @@
-services:
-  client-b:
-    image: swatikadam16/client-b-python-app:latest
-    ports:
-      - "8000:8000"      
-    networks:
-      - app-network
-    deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.client-b.rule=Host(`client-b.example.com`)"
-        - "traefik.http.services.client-b.loadbalancer.server.port=8000"
-      replicas: 3
-      restart_policy:
-        condition: on-failure
-      update_config:
-        parallelism: 1
-        delay: 10s
-    secrets:
-      - client_b_db
+name: Branch Based Deploy
 
-networks:
-  app-network:
-    external: true
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - 'feature/*'
+  workflow_dispatch:
 
-secrets:
-  client_b_db:
-    external: true
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # -------------------------------
+      # 1️⃣ Checkout Code
+      # -------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # -------------------------------
+      # 2️⃣ Detect Environment from Branch
+      # -------------------------------
+      - name: Set Environment Based on Branch
+        run: |
+          if [[ "${GITHUB_REF}" == "refs/heads/master" ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+          elif [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+          fi
+
+      # -------------------------------
+      # 3️⃣ Login to Docker Hub
+      # -------------------------------
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # -------------------------------
+      # 4️⃣ Build Docker Image
+      # -------------------------------
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t swatikadam16/client-a-node-app:${{ github.sha }} \
+            -t swatikadam16/client-a-node-app:${ENVIRONMENT} \
+            .
+
+      # -------------------------------
+      # 5️⃣ Push Docker Image
+      # -------------------------------
+      - name: Push Docker image
+        run: |
+          docker push swatikadam16/client-a-node-app:${{ github.sha }}
+          docker push swatikadam16/client-a-node-app:${ENVIRONMENT}
+
+      # -------------------------------
+      # 6️⃣ Deploy Only for Staging & Production
+      # -------------------------------
+      - name: Deploy to Docker Swarm
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop'
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+        run: |
+          echo "${SSH_KEY}" > private_key.pem
+          chmod 600 private_key.pem
+
+          echo "Deploying to $ENVIRONMENT environment..."
+
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST <<EOF
+          
+          if [ "$ENVIRONMENT" = "production" ]; then
+            SERVICE_NAME="multi-client_client-a-prod"
+          else
+            SERVICE_NAME="multi-client_client-a-staging"
+          fi
+
+          echo "Updating service: \$SERVICE_NAME"
+
+          docker service update \
+            --image swatikadam16/client-a-node-app:${{ github.sha }} \
+            \$SERVICE_NAME
+
+          EOF

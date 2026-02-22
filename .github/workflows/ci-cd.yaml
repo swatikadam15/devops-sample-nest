@@ -3,8 +3,8 @@ name: Deploy
 on:
   push:
     branches:
-      - master       # Trigger when pushing to branch "master"
-  workflow_dispatch:  # Allow manual runs from GitHub Actions UI
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
@@ -22,24 +22,21 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 3: Build Docker image (with commit SHA and latest tags)
+      # Step 3: Build Docker image (directly with Docker Hub name)
       - name: Build Docker image
         run: |
-          docker build -t client-a-node-app:${{ github.sha }} -t client-a-node-app:latest .
+          docker build \
+            -t swatikadam16/client-a-node-app:${{ github.sha }} \
+            -t swatikadam16/client-a-node-app:latest \
+            .
 
-      # Step 4: Tag Docker image for Docker Hub
-      - name: Tag Docker image
-        run: |
-          docker tag client-a-node-app:${{ github.sha }} swatikadam16/client-a-node-app:${{ github.sha }}
-          docker tag client-a-node-app:latest swatikadam16/client-a-node-app:latest
-
-      # Step 5: Push Docker image to Docker Hub
+      # Step 4: Push Docker image to Docker Hub
       - name: Push Docker image to Docker Hub
         run: |
           docker push swatikadam16/client-a-node-app:${{ github.sha }}
           docker push swatikadam16/client-a-node-app:latest
 
-      # Step 6: Test SSH Connectivity (Optional but Recommended)
+      # Step 5: Test SSH Connectivity
       - name: Test SSH connection
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -48,10 +45,10 @@ jobs:
         run: |
           echo "${SSH_KEY}" > private_key.pem
           chmod 600 private_key.pem
-          echo "Testing SSH connectivity to $SSH_USER@$SSH_HOST ..."
-          ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST "echo ✅ Connected successfully to $(hostname)"          
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST \
+          "echo ✅ Connected successfully to $(hostname)"
 
-      # Step 7: Deploy to Docker Swarm on remote host
+      # Step 6: Deploy to Docker Swarm
       - name: Deploy to Docker Swarm
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -64,6 +61,6 @@ jobs:
           echo "Deploying new image on remote Swarm manager..."
           ssh -i private_key.pem -o StrictHostKeyChecking=no $SSH_USER@$SSH_HOST <<EOF
           docker service update \
-          --image swatikadam16/client-a-node-app:${{ github.sha }} \
-          multi-client_client-a
+            --image swatikadam16/client-a-node-app:${{ github.sha }} \
+            multi-client_client-a
           EOF

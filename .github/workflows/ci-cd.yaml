@@ -27,14 +27,13 @@ jobs:
         run: |
           docker build \
             -t swatikadam16/client-a-node-app:${{ github.sha }} \
-            -t swatikadam16/client-a-node-app:latest \
             .
 
       # Step 4: Push Docker image to Docker Hub
       - name: Push Docker image to Docker Hub
         run: |
           docker push swatikadam16/client-a-node-app:${{ github.sha }}
-          docker push swatikadam16/client-a-node-app:latest
+  
 
       # Step 5: Test SSH Connectivity
       - name: Test SSH connection
